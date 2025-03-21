@@ -103,7 +103,12 @@ EOF
 
 ### Настройка управления энергопотреблением
 
-#### Установка и настройка TLP
+### Настройка управления энергопотреблением
+
+#### Выбор системы управления энергопотреблением
+В Arch Linux есть две основные системы управления энергопотреблением: TLP и Power Profiles Daemon (PPD). Они конфликтуют между собой, поэтому нужно выбрать один из вариантов:
+
+**Вариант 1: Использование TLP (больше настроек, но без графического интерфейса)**
 ```bash
 # Установка TLP и дополнительных инструментов
 sudo pacman -S tlp tlp-rdw
@@ -149,38 +154,81 @@ SOUND_POWER_SAVE_ON_BAT=1
 PCIE_ASPM_ON_AC=performance
 PCIE_ASPM_ON_BAT=powersave
 EOF
+
+# Активация TLP
+sudo systemctl enable tlp.service
+sudo systemctl start tlp.service
+
+# Проверка статуса TLP
+sudo tlp-stat -s
+
+# Вы можете установить утилиту управления TLP с графическим интерфейсом
+paru -S tlpui
 ```
 
-#### Установка графического управления энергопотреблением
+**Вариант 2: Использование Power Profiles Daemon (интегрирован в GNOME, простой графический интерфейс)**
 ```bash
 # Установка Power Profiles Daemon для управления режимами питания через интерфейс GNOME
 sudo pacman -S power-profiles-daemon
 
-# Настройка TLP для совместной работы с Power Profiles Daemon
+# Убедитесь, что TLP не установлен или отключен, чтобы избежать конфликтов
+sudo systemctl disable tlp.service --now || true
+sudo pacman -R tlp tlp-rdw || true
+
+# Установка lm_sensors для мониторинга температуры
+sudo pacman -S lm_sensors
+sudo sensors-detect --auto
+
+# Активация PPD
+sudo systemctl enable power-profiles-daemon.service
+sudo systemctl start power-profiles-daemon.service
+
+# Установка GNOME расширения для удобного управления профилями питания (необязательно)
+paru -S gnome-shell-extension-power-profile-switcher
+
+# Проверка статуса Power Profiles Daemon
+powerprofilesctl list
+```
+
+**Вариант 3: Использование обоих с ограничением TLP (не рекомендуется, но возможно)**
+```bash
+# Установка обоих
+sudo pacman -S tlp power-profiles-daemon
+
+# Настройка TLP так, чтобы он не конфликтовал с PPD
 sudo mkdir -p /etc/tlp.d/
-sudo tee /etc/tlp.d/01-ppdcompat.conf > /dev/null << 'EOF'
-# Отключаем управление CPU и GPU при активации PPD
-TLP_PERSISTENT_DEFAULT=0
+sudo tee /etc/tlp.d/99-disable-pm.conf > /dev/null << 'EOF'
+# Отключаем управление CPU и GPU в TLP, чтобы избежать конфликтов с PPD
 CPU_SCALING_GOVERNOR_ON_AC=""
 CPU_SCALING_GOVERNOR_ON_BAT=""
+CPU_SCALING_MIN_FREQ_ON_AC=0
+CPU_SCALING_MAX_FREQ_ON_AC=0
+CPU_SCALING_MIN_FREQ_ON_BAT=0
+CPU_SCALING_MAX_FREQ_ON_BAT=0
 CPU_ENERGY_PERF_POLICY_ON_AC=""
 CPU_ENERGY_PERF_POLICY_ON_BAT=""
+CPU_BOOST_ON_AC=0
+CPU_BOOST_ON_BAT=0
 PLATFORM_PROFILE_ON_AC=""
 PLATFORM_PROFILE_ON_BAT=""
+# Отключаем Intel GPU настройки
+INTEL_GPU_MIN_FREQ_ON_AC=0
+INTEL_GPU_MAX_FREQ_ON_AC=0
+INTEL_GPU_MIN_FREQ_ON_BAT=0
+INTEL_GPU_MAX_FREQ_ON_BAT=0
+INTEL_GPU_BOOST_FREQ_ON_AC=0
+INTEL_GPU_BOOST_FREQ_ON_BAT=0
 EOF
 
-# Активация служб
+# Активация обоих сервисов
 sudo systemctl enable tlp.service
 sudo systemctl start tlp.service
 sudo systemctl enable power-profiles-daemon.service
 sudo systemctl start power-profiles-daemon.service
-
-# Установка GNOME расширения для удобного управления профилями питания
-paru -S gnome-shell-extension-power-profile-switcher
-
-# Проверка статуса TLP
-sudo tlp-stat -s
 ```
+
+Для стандартного использования рекомендуется **Вариант 2 (Power Profiles Daemon)**, так как он хорошо интегрирован с GNOME и предоставляет простой графический интерфейс для переключения профилей производительности.
+
 
 ### Настройка планировщика дисков
 ```bash
