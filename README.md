@@ -469,7 +469,7 @@ sudo pacman -Syu
 sudo pacman -S steam
 
 # Установка дополнительных библиотек для Steam
-sudo pacman -S lib32-mesa lib32-nvidia-utils lib32-libpulse lib32-alsa-plugins
+sudo pacman -S lib32-mesa lib32-libpulse lib32-alsa-plugins xorg-mkfontscale xorg-fonts-cyrillic xorg-fonts-misc
 ```
 
 ### Установка Proton GE (для лучшей совместимости с Windows-играми)
