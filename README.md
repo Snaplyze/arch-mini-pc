@@ -468,8 +468,11 @@ sudo pacman -Syu
 # Установка Steam
 sudo pacman -S steam
 
-# Установка дополнительных библиотек для Steam
-sudo pacman -S lib32-mesa lib32-libpulse lib32-alsa-plugins xorg-mkfontscale xorg-fonts-cyrillic xorg-fonts-misc
+# Установка 32-битных библиотек для Intel Graphics
+sudo pacman -S lib32-mesa lib32-vulkan-intel lib32-libpulse lib32-alsa-plugins xorg-mkfontscale xorg-fonts-cyrillic xorg-fonts-misc
+
+# Дополнительные библиотеки для лучшей совместимости игр
+sudo pacman -S vulkan-intel lib32-libva-mesa-driver lib32-openal
 ```
 
 ### Установка Proton GE (для лучшей совместимости с Windows-играми)
