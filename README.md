@@ -1,4 +1,35 @@
-# Настройка Arch Linux на мини-ПК с Intel Celeron N5095
+### Настройка GNOME для оптимальной работы с Wayland
+```bash
+# Установка дополнительных компонентов для Wayland
+sudo pacman -S xdg-desktop-portal xdg-desktop-portal-gnome gnome-keyring
+
+# Настройка GNOME для использования Wayland по умолчанию
+sudo tee /etc/gdm/custom.conf > /dev/null << 'EOF'
+# GDM configuration
+[daemon]
+# Uncomment the line below to force the login screen to use Xorg
+#WaylandEnable=false
+
+[security]
+
+[xdmcp]
+
+[chooser]
+
+[debug]
+EOF
+
+# Дополнительные настройки для Wayland
+gsettings set org.gnome.mutter experimental-features "['scale-monitor-framebuffer']"
+```### Настройка Chrome для Wayland
+```bash
+# Создание файла для запуска Chrome в режиме Wayland
+mkdir -p ~/.config/chrome-flags.d/
+tee ~/.config/chrome-flags.d/wayland.conf > /dev/null << 'EOF'
+--enable-features=UseOzonePlatform
+--ozone-platform=wayland
+EOF
+```# Настройка Arch Linux на мини-ПК с Intel Celeron N5095
 
 ## Характеристики системы
 - Процессор: Intel Celeron N5095 со встроенным графическим ядром Intel
@@ -12,35 +43,6 @@
 ```bash
 # Обновление репозиториев и пакетов
 sudo pacman -Syu
-```
-
-### Настройка зеркал с помощью reflector
-```bash
-# Установка reflector
-sudo pacman -S reflector
-
-# Создание резервной копии текущего списка зеркал
-sudo cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
-
-# Настройка зеркал для России, сортировка по скорости
-sudo reflector --country Russia --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist
-
-# Проверка обновленного списка зеркал
-cat /etc/pacman.d/mirrorlist
-
-# Настройка автоматического обновления зеркал
-sudo mkdir -p /etc/xdg/reflector
-sudo tee /etc/xdg/reflector/reflector.conf > /dev/null << 'EOF'
---save /etc/pacman.d/mirrorlist
---country Russia
---protocol https
---latest 10
---sort rate
-EOF
-
-# Включение и запуск службы reflector
-sudo systemctl enable reflector.timer
-sudo systemctl start reflector.timer
 ```
 
 ### Установка базовых утилит
@@ -82,153 +84,42 @@ sudo pacman -S mesa intel-media-driver libva-intel-driver intel-gpu-tools
 
 # Установка микрокода Intel для улучшения стабильности
 sudo pacman -S intel-ucode
+
+# Дополнительные пакеты для оптимальной работы Wayland
+sudo pacman -S xorg-server-xwayland qt5-wayland qt6-wayland
 ```
 
-### Настройка Xorg для Intel Graphics
+### Настройка Wayland для Intel Graphics
 ```bash
-# Создание конфигурационного файла
-sudo mkdir -p /etc/X11/xorg.conf.d/
-sudo tee /etc/X11/xorg.conf.d/20-intel.conf > /dev/null << 'EOF'
-Section "Device"
-    Identifier  "Intel Graphics"
-    Driver      "intel"
-    Option      "TearFree" "true"
-    Option      "AccelMethod" "sna"
-    Option      "DRI" "3"
-EndSection
+# Создание конфигурационного файла для улучшения производительности Wayland с Intel
+sudo mkdir -p /etc/environment.d/
+sudo tee /etc/environment.d/gpu.conf > /dev/null << 'EOF'
+# Улучшение производительности на Intel GPU
+LIBVA_DRIVER_NAME=iHD
+VDPAU_DRIVER=va_gl
+# Включение аппаратного ускорения
+MOZ_WEBRENDER=1
+MOZ_ACCELERATED=1
+# Для лучшей поддержки Wayland в приложениях
+MOZ_ENABLE_WAYLAND=1
+# Для Chrome/Electron приложений
+ELECTRON_OZONE_PLATFORM_HINT=wayland
 EOF
 ```
 
-## 3. Оптимизация системы
-
-### Настройка управления энергопотреблением
-
-### Настройка управления энергопотреблением
-
-#### Выбор системы управления энергопотреблением
-В Arch Linux есть две основные системы управления энергопотреблением: TLP и Power Profiles Daemon (PPD). Они конфликтуют между собой, поэтому нужно выбрать один из вариантов:
-
-**Вариант 1: Использование TLP (больше настроек, но без графического интерфейса)**
+### Установка утилит для управления энергопотреблением
 ```bash
-# Установка TLP и дополнительных инструментов
-sudo pacman -S tlp tlp-rdw
+# Для оптимизации энергопотребления на ноутбуках/мини-ПК
+sudo pacman -S tlp
+sudo systemctl enable tlp.service
+sudo systemctl start tlp.service
 
 # Установка инструментов для мониторинга температуры
 sudo pacman -S lm_sensors
 sudo sensors-detect --auto
-
-# Настройка конфигурации TLP для Celeron N5095
-sudo tee /etc/tlp.conf > /dev/null << 'EOF'
-# Основные настройки
-TLP_ENABLE=1
-TLP_DEFAULT_MODE=AC
-TLP_PERSISTENT_DEFAULT=0
-
-# Настройки CPU для Intel Celeron
-CPU_SCALING_GOVERNOR_ON_AC=performance
-CPU_SCALING_GOVERNOR_ON_BAT=powersave
-CPU_ENERGY_PERF_POLICY_ON_AC=performance
-CPU_ENERGY_PERF_POLICY_ON_BAT=power
-CPU_MIN_PERF_ON_AC=0
-CPU_MAX_PERF_ON_AC=100
-CPU_MIN_PERF_ON_BAT=0
-CPU_MAX_PERF_ON_BAT=80
-
-# Настройки для Intel GPU
-INTEL_GPU_MIN_FREQ_ON_AC=300
-INTEL_GPU_MAX_FREQ_ON_AC=1100
-INTEL_GPU_MIN_FREQ_ON_BAT=300
-INTEL_GPU_MAX_FREQ_ON_BAT=800
-INTEL_GPU_BOOST_FREQ_ON_AC=1100
-INTEL_GPU_BOOST_FREQ_ON_BAT=800
-
-# Настройки SATA
-SATA_LINKPWR_ON_AC="max_performance"
-SATA_LINKPWR_ON_BAT="medium_power"
-
-# Настройки звука
-SOUND_POWER_SAVE_ON_AC=0
-SOUND_POWER_SAVE_ON_BAT=1
-
-# Настройки PCI Express
-PCIE_ASPM_ON_AC=performance
-PCIE_ASPM_ON_BAT=powersave
-EOF
-
-# Активация TLP
-sudo systemctl enable tlp.service
-sudo systemctl start tlp.service
-
-# Проверка статуса TLP
-sudo tlp-stat -s
-
-# Вы можете установить утилиту управления TLP с графическим интерфейсом
-paru -S tlpui
 ```
 
-**Вариант 2: Использование Power Profiles Daemon (интегрирован в GNOME, простой графический интерфейс)**
-```bash
-# Установка Power Profiles Daemon для управления режимами питания через интерфейс GNOME
-sudo pacman -S power-profiles-daemon
-
-# Убедитесь, что TLP не установлен или отключен, чтобы избежать конфликтов
-sudo systemctl disable tlp.service --now || true
-sudo pacman -R tlp tlp-rdw || true
-
-# Установка lm_sensors для мониторинга температуры
-sudo pacman -S lm_sensors
-sudo sensors-detect --auto
-
-# Активация PPD
-sudo systemctl enable power-profiles-daemon.service
-sudo systemctl start power-profiles-daemon.service
-
-# Установка GNOME расширения для удобного управления профилями питания (необязательно)
-paru -S gnome-shell-extension-power-profile-switcher
-
-# Проверка статуса Power Profiles Daemon
-powerprofilesctl list
-```
-
-**Вариант 3: Использование обоих с ограничением TLP (не рекомендуется, но возможно)**
-```bash
-# Установка обоих
-sudo pacman -S tlp power-profiles-daemon
-
-# Настройка TLP так, чтобы он не конфликтовал с PPD
-sudo mkdir -p /etc/tlp.d/
-sudo tee /etc/tlp.d/99-disable-pm.conf > /dev/null << 'EOF'
-# Отключаем управление CPU и GPU в TLP, чтобы избежать конфликтов с PPD
-CPU_SCALING_GOVERNOR_ON_AC=""
-CPU_SCALING_GOVERNOR_ON_BAT=""
-CPU_SCALING_MIN_FREQ_ON_AC=0
-CPU_SCALING_MAX_FREQ_ON_AC=0
-CPU_SCALING_MIN_FREQ_ON_BAT=0
-CPU_SCALING_MAX_FREQ_ON_BAT=0
-CPU_ENERGY_PERF_POLICY_ON_AC=""
-CPU_ENERGY_PERF_POLICY_ON_BAT=""
-CPU_BOOST_ON_AC=0
-CPU_BOOST_ON_BAT=0
-PLATFORM_PROFILE_ON_AC=""
-PLATFORM_PROFILE_ON_BAT=""
-# Отключаем Intel GPU настройки
-INTEL_GPU_MIN_FREQ_ON_AC=0
-INTEL_GPU_MAX_FREQ_ON_AC=0
-INTEL_GPU_MIN_FREQ_ON_BAT=0
-INTEL_GPU_MAX_FREQ_ON_BAT=0
-INTEL_GPU_BOOST_FREQ_ON_AC=0
-INTEL_GPU_BOOST_FREQ_ON_BAT=0
-EOF
-
-# Активация обоих сервисов
-sudo systemctl enable tlp.service
-sudo systemctl start tlp.service
-sudo systemctl enable power-profiles-daemon.service
-sudo systemctl start power-profiles-daemon.service
-```
-
-Для стандартного использования рекомендуется **Вариант 2 (Power Profiles Daemon)**, так как он хорошо интегрирован с GNOME и предоставляет простой графический интерфейс для переключения профилей производительности.
-
+## 3. Оптимизация системы
 
 ### Настройка планировщика дисков
 ```bash
@@ -280,18 +171,6 @@ sudo sed -i '/ext4/ s/defaults/defaults,noatime,commit=60/g' /etc/fstab
 cat /etc/fstab
 ```
 
-### Настройка ZRAM для улучшения производительности
-```bash
-# Включение ZRAM для улучшения производительности с ограниченной памятью
-sudo pacman -S zram-generator
-sudo tee /etc/systemd/zram-generator.conf > /dev/null << 'EOF'
-[zram0]
-zram-size = ram / 2
-compression-algorithm = zstd
-EOF
-sudo systemctl restart systemd-zram-setup@zram0.service
-```
-
 ### Настройка системных лимитов
 ```bash
 # Увеличение лимитов системы для разработки
@@ -303,57 +182,7 @@ sudo tee /etc/security/limits.conf > /dev/null << 'EOF'
 EOF
 ```
 
-### Оптимизация сетевых настроек
-```bash
-# Оптимизация сетевого стека
-sudo tee /etc/sysctl.d/99-network-performance.conf > /dev/null << 'EOF'
-# Увеличение размера буфера приема и отправки
-net.core.rmem_max = 16777216
-net.core.wmem_max = 16777216
-net.core.rmem_default = 1048576
-net.core.wmem_default = 1048576
-net.ipv4.tcp_rmem = 4096 1048576 16777216
-net.ipv4.tcp_wmem = 4096 1048576 16777216
-
-# Оптимизация TCP
-net.ipv4.tcp_fastopen = 3
-net.ipv4.tcp_slow_start_after_idle = 0
-net.ipv4.tcp_mtu_probing = 1
-EOF
-
-# Применение изменений
-sudo sysctl --system
-```
-
-## 4. Настройка системы Btrfs и резервного копирования
-
-### Настройка Snapper для Btrfs
-```bash
-# Инструменты для работы с Btrfs
-sudo pacman -S snapper snap-pac grub-btrfs
-
-# Настройка Snapper
-sudo umount /.snapshots || true  # Игнорировать ошибку, если не примонтировано
-sudo rm -rf /.snapshots || true
-sudo snapper -c root create-config /
-sudo mkdir -p /.snapshots
-sudo chmod 750 /.snapshots
-
-# Настройка Snapper для регулярных снапшотов
-sudo systemctl enable --now snapper-timeline.timer
-sudo systemctl enable --now snapper-cleanup.timer
-```
-
-### Установка Timeshift
-```bash
-# Установка Timeshift для создания резервных копий
-paru -S timeshift
-
-# Теперь можно запустить Timeshift и настроить его:
-sudo timeshift-launcher
-```
-
-## 5. Установка Docker и Docker Compose
+## 4. Установка Docker и Docker Compose
 
 ### Установка Docker
 ```bash
@@ -396,65 +225,7 @@ EOF
 sudo systemctl restart docker
 ```
 
-## 6. Установка современной аудиосистемы
-
-### Установка PipeWire
-```bash
-# Установка PipeWire вместо PulseAudio для лучшей производительности
-sudo pacman -S pipewire pipewire-pulse pipewire-alsa pipewire-jack wireplumber
-
-# Установка утилит для управления звуком
-sudo pacman -S pavucontrol easyeffects
-
-# Переключение на PipeWire
-systemctl --user enable pipewire.service pipewire-pulse.service wireplumber.service
-systemctl --user start pipewire.service pipewire-pulse.service wireplumber.service
-
-# Отключение PulseAudio, если он установлен
-systemctl --user disable pulseaudio.service pulseaudio.socket
-systemctl --user stop pulseaudio.service pulseaudio.socket
-```
-
-## 7. Настройка Bluetooth
-
-### Установка и активация Bluetooth
-```bash
-# Установка необходимых пакетов для Bluetooth
-sudo pacman -S bluez bluez-utils bluez-tools
-
-# Установка графических утилит для Bluetooth
-sudo pacman -S blueman
-
-# Включение и запуск службы Bluetooth
-sudo systemctl enable bluetooth.service
-sudo systemctl start bluetooth.service
-
-# Настройка автоматического включения Bluetooth при загрузке
-sudo tee /etc/bluetooth/main.conf > /dev/null << 'EOF'
-[General]
-# Настройка автоматического включения
-AutoEnable=true
-# Улучшение качества звука для A2DP
-ControllerMode = bredr
-EOF
-
-# Перезапуск службы для применения изменений
-sudo systemctl restart bluetooth.service
-
-# Добавление текущего пользователя в группу bluetooth
-sudo usermod -aG lp $USER
-```
-
-### Интеграция Bluetooth с PipeWire
-```bash
-# Убедимся, что Bluetooth аудио работает с PipeWire
-sudo pacman -S libspa-bluetooth
-
-# Проверка статуса Bluetooth
-bluetoothctl show
-```
-
-## 8. Установка Steam и игровых компонентов
+## 5. Установка Steam и игровых компонентов
 
 ### Включение мультибиблиотечной поддержки
 ```bash
@@ -463,16 +234,36 @@ sudo sed -i "/\[multilib\]/,/Include/s/^#//" /etc/pacman.conf
 sudo pacman -Syu
 ```
 
-### Установка Steam
+### Установка Steam и Wayland-совместимость
 ```bash
 # Установка Steam
 sudo pacman -S steam
 
-# Установка 32-битных библиотек для Intel Graphics
-sudo pacman -S lib32-mesa lib32-vulkan-intel lib32-libpulse lib32-alsa-plugins xorg-mkfontscale xorg-fonts-cyrillic xorg-fonts-misc
+# Установка дополнительных библиотек для Steam
+sudo pacman -S lib32-mesa lib32-nvidia-utils lib32-libpulse lib32-alsa-plugins xorg-mkfontscale xorg-fonts-cyrillic xorg-fonts-misc
 
-# Дополнительные библиотеки для лучшей совместимости игр
-sudo pacman -S vulkan-intel lib32-libva-mesa-driver lib32-openal
+# Создание файла для запуска Steam в режиме Wayland
+mkdir -p ~/.config/steam
+tee ~/.config/steam/steam-wayland.sh > /dev/null << 'EOF'
+#!/bin/bash
+SDL_VIDEODRIVER=wayland
+steam -forcedesktopscaling 1 -fulldesktopres "$@"
+EOF
+chmod +x ~/.config/steam/steam-wayland.sh
+
+# Создание .desktop файла для запуска Steam в Wayland
+mkdir -p ~/.local/share/applications/
+tee ~/.local/share/applications/steam-wayland.desktop > /dev/null << 'EOF'
+[Desktop Entry]
+Name=Steam (Wayland)
+Comment=Application for managing and playing games on Steam
+Exec=~/.config/steam/steam-wayland.sh %U
+Icon=steam
+Terminal=false
+Type=Application
+Categories=Network;FileTransfer;Game;
+MimeType=x-scheme-handler/steam;x-scheme-handler/steamlink;
+EOF
 ```
 
 ### Установка Proton GE (для лучшей совместимости с Windows-играми)
@@ -498,15 +289,15 @@ sudo pacman -S gamemode lib32-gamemode
 gamemoded -t
 ```
 
-## 9. Установка дополнительных программ и утилит
+## 6. Установка дополнительных библиотек и программ
 
-### Мультимедийные кодеки и проигрыватели
+### Мультимедийные кодеки и библиотеки
 ```bash
 # Установка мультимедийных кодеков
 sudo pacman -S ffmpeg gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav
 
-# Установка мультимедийных проигрывателей
-sudo pacman -S vlc mpv celluloid
+# Установка библиотек для аудио
+sudo pacman -S pulseaudio pulseaudio-alsa pulseaudio-bluetooth alsa-utils
 ```
 
 ### Инструменты разработки
@@ -518,16 +309,6 @@ sudo pacman -S python python-pip nodejs npm gcc make cmake
 sudo pacman -S code # Visual Studio Code
 # ИЛИ
 paru -S visual-studio-code-bin # Если предпочитаете бинарную версию
-
-# Установка инструментов для разработки
-sudo pacman -S git-lfs github-cli meld
-
-# Конфигурация Git
-git config --global user.name "Ваше Имя"
-git config --global user.email "ваша.почта@example.com"
-git config --global init.defaultBranch main
-git config --global pull.rebase false
-git config --global core.editor "vim"
 ```
 
 ### Офисные и интернет-приложения
@@ -545,26 +326,7 @@ sudo pacman -S libreoffice-fresh
 sudo pacman -S p7zip unrar unzip zip
 ```
 
-### Системные мониторы и утилиты
-```bash
-# Установка улучшенных системных мониторов
-sudo pacman -S htop btop bpytop
-
-# Улучшенный терминал и оболочка
-sudo pacman -S zsh
-paru -S oh-my-zsh-git
-
-# Настройка zsh как оболочки по умолчанию (при желании)
-chsh -s /usr/bin/zsh
-
-# Улучшенные утилиты командной строки
-sudo pacman -S bat fd ripgrep fzf rsync
-
-# Сетевые инструменты
-sudo pacman -S iftop nethogs nmap traceroute
-```
-
-## 10. Оптимизация GNOME
+## 7. Оптимизация GNOME для Wayland
 
 ### Установка дополнительных расширений GNOME
 ```bash
@@ -592,46 +354,7 @@ sudo pacman -S papirus-icon-theme arc-gtk-theme arc-icon-theme
 sudo pacman -S ttf-dejavu ttf-liberation noto-fonts noto-fonts-emoji ttf-roboto ttf-roboto-mono
 ```
 
-## 11. Настройка безопасности
-
-### Настройка брандмауэра
-```bash
-# Установка и настройка UFW (простой брандмауэр)
-sudo pacman -S ufw gufw  # gufw - графический интерфейс для UFW
-sudo systemctl enable ufw
-sudo systemctl start ufw
-
-# Настройка базовых правил
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-sudo ufw allow ssh
-sudo ufw allow http
-sudo ufw allow https
-
-# Включение брандмауэра
-sudo ufw enable
-
-# Установка и настройка Fail2Ban для защиты от брутфорс-атак
-sudo pacman -S fail2ban
-sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
-sudo systemctl enable fail2ban
-sudo systemctl start fail2ban
-```
-
-### Обновление микропрограмм
-```bash
-# Установка fwupd для обновления микропрограмм
-sudo pacman -S fwupd
-
-# Получение доступных обновлений микропрограмм
-sudo fwupdmgr refresh
-sudo fwupdmgr get-updates
-
-# Установка обновлений микропрограмм
-sudo fwupdmgr update
-```
-
-## 12. Настройка автоматических обновлений
+## 8. Настройка автоматических обновлений
 
 ### Установка и настройка системы автообновления
 ```bash
@@ -665,7 +388,66 @@ sudo systemctl enable pacman-updates.timer
 sudo systemctl start pacman-updates.timer
 ```
 
-## 13. Полезные советы и обслуживание системы
+## 9. Завершающие настройки
+
+### Настройка брандмауэра
+```bash
+# Установка и настройка UFW (простой брандмауэр)
+sudo pacman -S ufw
+sudo systemctl enable ufw
+sudo systemctl start ufw
+
+# Настройка базовых правил
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow ssh
+sudo ufw allow http
+sudo ufw allow https
+
+# Включение брандмауэра
+sudo ufw enable
+```
+
+### Создание резервных копий системы
+```bash
+# Установка Timeshift для создания резервных копий
+paru -S timeshift
+
+# Запуск Timeshift и настройка резервного копирования
+sudo timeshift-launcher
+```
+
+### Проверка системы
+```bash
+# Проверка на наличие ошибок в журнале
+sudo journalctl -p 3 -b
+
+# Проверка температуры процессора
+sensors
+
+# Проверка использования дисков
+df -h
+```
+
+## 10. Полезные советы
+
+### Решение проблем с Wayland
+```bash
+# Проверка, запущена ли сессия в Wayland
+echo $XDG_SESSION_TYPE
+
+# Диагностика Wayland
+journalctl -b -p 3
+
+# Для приложений, которые не поддерживают Wayland, создайте скрипт-обертку
+tee ~/bin/xwayland-run > /dev/null << 'EOF'
+#!/bin/bash
+GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb "$@"
+EOF
+chmod +x ~/bin/xwayland-run
+
+# Использование: xwayland-run <программа>
+```
 
 ### Ускорение загрузки Arch Linux
 ```bash
@@ -692,44 +474,21 @@ sudo btrfs balance start -dusage=85 /
 sudo btrfs scrub start /
 ```
 
-### Проверка системы
+### Обновление микропрограмм
 ```bash
-# Проверка на наличие ошибок в журнале
-sudo journalctl -p 3 -b
+# Установка fwupd для обновления микропрограмм
+sudo pacman -S fwupd
 
-# Проверка температуры процессора
-sensors
+# Получение доступных обновлений микропрограмм
+sudo fwupdmgr refresh
+sudo fwupdmgr get-updates
 
-# Проверка использования дисков
-df -h
-
-# Проверка состояния Btrfs
-sudo btrfs scrub status /
-sudo btrfs fi usage /
+# Установка обновлений микропрограмм
+sudo fwupdmgr update
 ```
 
 ## Заключение
 
-Данная инструкция охватывает все основные аспекты настройки Arch Linux на мини-ПК с Intel Celeron N5095. После выполнения всех шагов вы получите полностью оптимизированную систему с:
+Данная инструкция охватывает основные аспекты настройки Arch Linux на мини-ПК с Intel Celeron N5095. После выполнения всех шагов вы получите оптимизированную систему с установленными Docker, Docker Compose, Steam и необходимыми библиотеками.
 
-- Настроенными драйверами Intel для графики и процессора
-- Оптимизированной файловой системой Btrfs для системного диска
-- Настроенной системой резервного копирования и снапшотов
-- Установленными Docker, Docker Compose для разработки
-- Настроенным Steam с Proton GE для игр
-- Современной аудиосистемой на базе PipeWire
-- Настроенным и оптимизированным Bluetooth
-- Улучшенной безопасностью и производительностью
-- Оптимизированными сетевыми настройками
-
-Регулярно обновляйте систему командой `paru -Syu` для поддержания безопасности и стабильности работы.
-
-Дополнительно рекомендуется периодически проверять состояние Btrfs файловой системы с помощью:
-```bash
-sudo btrfs scrub status /
-```
-
-И следить за свободным местом:
-```bash
-sudo btrfs fi usage /
-```
+Регулярно обновляйте систему командой `sudo pacman -Syu` для поддержания безопасности и стабильности работы.
