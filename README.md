@@ -1,41 +1,11 @@
-### Настройка GNOME для оптимальной работы с Wayland
-```bash
-# Установка дополнительных компонентов для Wayland
-sudo pacman -S xdg-desktop-portal xdg-desktop-portal-gnome gnome-keyring
-
-# Настройка GNOME для использования Wayland по умолчанию
-sudo tee /etc/gdm/custom.conf > /dev/null << 'EOF'
-# GDM configuration
-[daemon]
-# Uncomment the line below to force the login screen to use Xorg
-#WaylandEnable=false
-
-[security]
-
-[xdmcp]
-
-[chooser]
-
-[debug]
-EOF
-
-# Дополнительные настройки для Wayland
-gsettings set org.gnome.mutter experimental-features "['scale-monitor-framebuffer']"
-```### Настройка Chrome для Wayland
-```bash
-# Создание файла для запуска Chrome в режиме Wayland
-mkdir -p ~/.config/chrome-flags.d/
-tee ~/.config/chrome-flags.d/wayland.conf > /dev/null << 'EOF'
---enable-features=UseOzonePlatform
---ozone-platform=wayland
-EOF
-```# Настройка Arch Linux на мини-ПК с Intel Celeron N5095
+# Настройка Arch Linux на мини-ПК с Intel Celeron N5095
 
 ## Характеристики системы
 - Процессор: Intel Celeron N5095 со встроенным графическим ядром Intel
 - ОЗУ: 16 ГБ
 - Накопители: 2 SATA SSD (системный диск - Btrfs, второй диск для медиа - ext4)
-- Рабочий стол: GNOME
+- Рабочий стол: GNOME с Wayland
+- Аудиосистема: PipeWire
 
 ## 1. Подготовка системы
 
@@ -86,7 +56,7 @@ sudo pacman -S mesa intel-media-driver libva-intel-driver intel-gpu-tools
 sudo pacman -S intel-ucode
 
 # Дополнительные пакеты для оптимальной работы Wayland
-sudo pacman -S xorg-server-xwayland qt5-wayland qt6-wayland
+sudo pacman -S xorg-server-xwayland qt5-wayland qt6-wayland xorg-mkfontscale xorg-fonts-cyrillic xorg-fonts-misc
 ```
 
 ### Настройка Wayland для Intel Graphics
@@ -144,17 +114,6 @@ sudo systemctl start fstrim.timer
 sudo fstrim -av
 ```
 
-### Настройка swappiness
-```bash
-# Уменьшение swappiness для лучшей производительности на системах с достаточным ОЗУ
-sudo tee /etc/sysctl.d/99-swappiness.conf > /dev/null << 'EOF'
-vm.swappiness=10
-EOF
-
-# Применение изменений
-sudo sysctl -p /etc/sysctl.d/99-swappiness.conf
-```
-
 ### Оптимизация производительности файловой системы
 ```bash
 # Резервная копия fstab
@@ -171,6 +130,17 @@ sudo sed -i '/ext4/ s/defaults/defaults,noatime,commit=60/g' /etc/fstab
 cat /etc/fstab
 ```
 
+### Настройка swappiness
+```bash
+# Уменьшение swappiness для лучшей производительности на системах с достаточным ОЗУ
+sudo tee /etc/sysctl.d/99-swappiness.conf > /dev/null << 'EOF'
+vm.swappiness=10
+EOF
+
+# Применение изменений
+sudo sysctl -p /etc/sysctl.d/99-swappiness.conf
+```
+
 ### Настройка системных лимитов
 ```bash
 # Увеличение лимитов системы для разработки
@@ -182,7 +152,66 @@ sudo tee /etc/security/limits.conf > /dev/null << 'EOF'
 EOF
 ```
 
-## 4. Установка Docker и Docker Compose
+## 4. Установка и настройка PipeWire
+
+### Установка и настройка PipeWire
+```bash
+# Установка PipeWire и связанных компонентов
+sudo pacman -S pipewire pipewire-alsa pipewire-pulse pipewire-jack wireplumber
+
+# Установка дополнительных инструментов для работы с аудио
+sudo pacman -S pavucontrol easyeffects helvum
+
+# Включение сервисов PipeWire
+systemctl --user enable pipewire.socket
+systemctl --user enable pipewire-pulse.socket
+systemctl --user enable wireplumber.service
+
+# Запуск сервисов PipeWire
+systemctl --user start pipewire.socket
+systemctl --user start pipewire-pulse.socket
+systemctl --user start wireplumber.service
+
+# Проверка статуса PipeWire
+pactl info | grep "Server Name"
+```
+
+### Мультимедийные кодеки и дополнительные библиотеки
+```bash
+# Установка мультимедийных кодеков
+sudo pacman -S ffmpeg gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav
+
+# Установка дополнительных библиотек для мультимедиа
+sudo pacman -S alsa-utils sof-firmware bluez bluez-utils
+sudo systemctl enable bluetooth.service
+sudo systemctl start bluetooth.service
+```
+
+### Тестирование и оптимизация PipeWire
+```bash
+# Проверка задержки звука
+pw-top
+
+# Настройка низкой задержки для PipeWire
+mkdir -p ~/.config/pipewire/
+tee ~/.config/pipewire/pipewire.conf.d/99-lowlatency.conf > /dev/null << 'EOF'
+context.properties = {
+    default.clock.rate = 48000
+    default.clock.quantum = 32
+    default.clock.min-quantum = 32
+    default.clock.max-quantum = 32
+}
+EOF
+
+# Проверка конфигурации
+systemctl --user restart pipewire.service
+systemctl --user status pipewire.service
+
+# Для игр через Steam - лучшая совместимость с PipeWire
+echo 'SDL_AUDIODRIVER=pipewire' >> ~/.bashrc
+```
+
+## 5. Установка Docker и Docker Compose
 
 ### Установка Docker
 ```bash
@@ -225,7 +254,7 @@ EOF
 sudo systemctl restart docker
 ```
 
-## 5. Установка Steam и игровых компонентов
+## 6. Установка Steam и игровых компонентов
 
 ### Включение мультибиблиотечной поддержки
 ```bash
@@ -240,7 +269,7 @@ sudo pacman -Syu
 sudo pacman -S steam
 
 # Установка дополнительных библиотек для Steam
-sudo pacman -S lib32-mesa lib32-nvidia-utils lib32-libpulse lib32-alsa-plugins xorg-mkfontscale xorg-fonts-cyrillic xorg-fonts-misc
+sudo pacman -S lib32-mesa lib32-pipewire lib32-pipewire-jack lib32-alsa-plugins
 
 # Создание файла для запуска Steam в режиме Wayland
 mkdir -p ~/.config/steam
@@ -289,16 +318,7 @@ sudo pacman -S gamemode lib32-gamemode
 gamemoded -t
 ```
 
-## 6. Установка дополнительных библиотек и программ
-
-### Мультимедийные кодеки и библиотеки
-```bash
-# Установка мультимедийных кодеков
-sudo pacman -S ffmpeg gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav
-
-# Установка библиотек для аудио
-sudo pacman -S pulseaudio pulseaudio-alsa pulseaudio-bluetooth alsa-utils
-```
+## 7. Установка дополнительных библиотек и программ
 
 ### Инструменты разработки
 ```bash
@@ -319,6 +339,13 @@ sudo pacman -S firefox
 # Установка Google Chrome
 paru -S google-chrome
 
+# Настройка Chrome для Wayland
+mkdir -p ~/.config/chrome-flags.d/
+tee ~/.config/chrome-flags.d/wayland.conf > /dev/null << 'EOF'
+--enable-features=UseOzonePlatform
+--ozone-platform=wayland
+EOF
+
 # Офисные приложения
 sudo pacman -S libreoffice-fresh
 
@@ -326,7 +353,32 @@ sudo pacman -S libreoffice-fresh
 sudo pacman -S p7zip unrar unzip zip
 ```
 
-## 7. Оптимизация GNOME для Wayland
+## 8. Оптимизация GNOME для Wayland
+
+### Настройка GNOME для оптимальной работы с Wayland
+```bash
+# Установка дополнительных компонентов для Wayland
+sudo pacman -S xdg-desktop-portal xdg-desktop-portal-gnome gnome-keyring
+
+# Настройка GNOME для использования Wayland по умолчанию
+sudo tee /etc/gdm/custom.conf > /dev/null << 'EOF'
+# GDM configuration
+[daemon]
+# Uncomment the line below to force the login screen to use Xorg
+#WaylandEnable=false
+
+[security]
+
+[xdmcp]
+
+[chooser]
+
+[debug]
+EOF
+
+# Дополнительные настройки для Wayland
+gsettings set org.gnome.mutter experimental-features "['scale-monitor-framebuffer']"
+```
 
 ### Установка дополнительных расширений GNOME
 ```bash
@@ -354,7 +406,7 @@ sudo pacman -S papirus-icon-theme arc-gtk-theme arc-icon-theme
 sudo pacman -S ttf-dejavu ttf-liberation noto-fonts noto-fonts-emoji ttf-roboto ttf-roboto-mono
 ```
 
-## 8. Настройка автоматических обновлений
+## 9. Настройка автоматических обновлений
 
 ### Установка и настройка системы автообновления
 ```bash
@@ -388,7 +440,7 @@ sudo systemctl enable pacman-updates.timer
 sudo systemctl start pacman-updates.timer
 ```
 
-## 9. Завершающие настройки
+## 10. Завершающие настройки
 
 ### Настройка брандмауэра
 ```bash
@@ -429,7 +481,7 @@ sensors
 df -h
 ```
 
-## 10. Полезные советы
+## 11. Полезные советы
 
 ### Решение проблем с Wayland
 ```bash
@@ -447,6 +499,24 @@ EOF
 chmod +x ~/bin/xwayland-run
 
 # Использование: xwayland-run <программа>
+```
+
+### Решение проблем с аудио через PipeWire
+```bash
+# Если возникают проблемы с аудио в Steam или Wine
+sudo pacman -S lib32-pipewire lib32-pipewire-jack
+
+# Если нужна совместимость с JACK-приложениями
+sudo pacman -S realtime-privileges
+sudo usermod -aG realtime $USER
+
+# Для диагностики проблем с PipeWire
+pw-cli dump
+pw-cli info all
+
+# Для исправления проблем с Bluetooth-аудио
+paru -S pipewire-bluetooth-a2dp-codecs-git
+systemctl --user restart pipewire-pulse.service
 ```
 
 ### Ускорение загрузки Arch Linux
