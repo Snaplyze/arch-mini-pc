@@ -37,7 +37,7 @@ sudo mkdir -p /etc/xdg/reflector/
 sudo tee /etc/xdg/reflector/reflector.conf > /dev/null << 'EOF'
 --save /etc/pacman.d/mirrorlist
 --protocol https
---country "Russia,Belarus,Germany,France,Sweden"
+--country "Russia,Belarus,Germany,France"
 --latest 20
 --sort rate
 EOF
@@ -105,14 +105,17 @@ EOF
 
 ### Установка утилит для управления энергопотреблением
 ```bash
-# Для оптимизации энергопотребления на ноутбуках/мини-ПК
-sudo pacman -S tlp
-sudo systemctl enable tlp.service
-sudo systemctl start tlp.service
+# Установка power-profiles-daemon для интеграции с GNOME
+sudo pacman -S power-profiles-daemon
+sudo systemctl enable power-profiles-daemon.service
+sudo systemctl start power-profiles-daemon.service
 
 # Установка инструментов для мониторинга температуры
 sudo pacman -S lm_sensors
 sudo sensors-detect --auto
+
+# Проверка доступных профилей энергопотребления
+powerprofilesctl list
 ```
 
 ## 3. Оптимизация системы
@@ -219,7 +222,7 @@ sudo systemctl start bluetooth.service
 pw-top
 
 # Настройка низкой задержки для PipeWire
-mkdir -p ~/.config/pipewire/
+mkdir -p ~/.config/pipewire/pipewire.conf.d/
 tee ~/.config/pipewire/pipewire.conf.d/99-lowlatency.conf > /dev/null << 'EOF'
 context.properties = {
     default.clock.rate = 48000
@@ -404,6 +407,10 @@ EOF
 
 # Дополнительные настройки для Wayland
 gsettings set org.gnome.mutter experimental-features "['scale-monitor-framebuffer']"
+
+# Настройка плагина для управления питанием в GNOME
+gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
+gsettings set org.gnome.desktop.session idle-delay 900
 ```
 
 ### Установка дополнительных расширений GNOME
@@ -518,11 +525,16 @@ echo $XDG_SESSION_TYPE
 journalctl -b -p 3
 
 # Для приложений, которые не поддерживают Wayland, создайте скрипт-обертку
+mkdir -p ~/bin
 tee ~/bin/xwayland-run > /dev/null << 'EOF'
 #!/bin/bash
 GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb "$@"
 EOF
 chmod +x ~/bin/xwayland-run
+
+# Добавление ~/bin в PATH, если его еще нет
+echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
 
 # Использование: xwayland-run <программа>
 ```
@@ -552,6 +564,13 @@ systemctl --user mask evolution-addressbook-factory.service evolution-calendar-f
 
 # Анализ времени загрузки
 systemd-analyze blame
+
+# Отключение службы NetworkManager-wait-online.service для ускорения загрузки
+sudo systemctl disable NetworkManager-wait-online.service
+
+# Оптимизация параметров загрузки в GRUB
+sudo sed -i 's/GRUB_TIMEOUT=5/GRUB_TIMEOUT=1/' /etc/default/grub
+sudo grub-mkconfig -o /boot/grub/grub.cfg
 ```
 
 ### Очистка системы
@@ -583,8 +602,48 @@ sudo fwupdmgr get-updates
 sudo fwupdmgr update
 ```
 
+### Оптимизация процессора Intel и управление энергопотреблением
+```bash
+# Установка утилит для управления процессором Intel
+sudo pacman -S intel-undervolt thermald
+
+# Настройка thermald для контроля температуры процессора
+sudo systemctl enable thermald
+sudo systemctl start thermald
+
+# Создание конфигурации для intel-undervolt (требуется осторожность)
+sudo cp /etc/intel-undervolt.conf /etc/intel-undervolt.conf.bak
+sudo nano /etc/intel-undervolt.conf
+
+# После настройки включите сервис
+sudo systemctl enable intel-undervolt
+sudo systemctl start intel-undervolt
+
+# Настройка доступа к режимам энергосбережения через GNOME
+gsettings set org.gnome.settings-daemon.plugins.power power-saver-profile-on-low-battery true
+
+# Проверка режимов производительности
+powerprofilesctl list
+```
+
 ## Заключение
 
-Данная инструкция охватывает основные аспекты настройки Arch Linux на мини-ПК с Intel Celeron N5095. После выполнения всех шагов вы получите оптимизированную систему с установленными Docker, Docker Compose, Steam и необходимыми библиотеками.
+Данная инструкция охватывает полный процесс настройки Arch Linux на мини-ПК с Intel Celeron N5095. После выполнения всех шагов вы получите оптимизированную систему с:
+
+- Оптимизированными зеркалами через Reflector
+- Установленным помощником AUR (paru)
+- Настроенными драйверами Intel и Wayland
+- Оптимизированными файловыми системами (Btrfs и ext4)
+- Современной аудиосистемой PipeWire
+- Установленными Docker и Docker Compose
+- Настроенным Steam с поддержкой Wayland
+- Google Chrome и другими полезными приложениями
+- Оптимизированным рабочим столом GNOME
 
 Регулярно обновляйте систему командой `sudo pacman -Syu` для поддержания безопасности и стабильности работы.
+
+Для полного применения всех изменений рекомендуется перезагрузить систему после завершения настройки:
+
+```bash
+sudo reboot
+```
