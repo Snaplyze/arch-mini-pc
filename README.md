@@ -21,6 +21,32 @@ sudo pacman -Syu
 sudo pacman -S base-devel git wget curl vim htop neofetch
 ```
 
+### Настройка Reflector для оптимизации зеркал
+```bash
+# Установка Reflector для выбора оптимальных зеркал
+sudo pacman -S reflector
+
+# Создание резервной копии списка зеркал
+sudo cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
+
+# Настройка Reflector для выбора 20 наиболее быстрых зеркал
+sudo reflector --verbose --latest 20 --sort rate --save /etc/pacman.d/mirrorlist
+
+# Настройка автоматического обновления зеркал
+sudo mkdir -p /etc/xdg/reflector/
+sudo tee /etc/xdg/reflector/reflector.conf > /dev/null << 'EOF'
+--save /etc/pacman.d/mirrorlist
+--protocol https
+--country "Russia,Belarus,Germany,France,Sweden"
+--latest 20
+--sort rate
+EOF
+
+# Включение и запуск службы Reflector
+sudo systemctl enable reflector.timer
+sudo systemctl start reflector.timer
+```
+
 ### Настройка AUR-помощника (paru)
 ```bash
 # Установка paru для удобной работы с AUR в скрытую папку .paru
