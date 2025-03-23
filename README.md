@@ -37,7 +37,7 @@ sudo mkdir -p /etc/xdg/reflector/
 sudo tee /etc/xdg/reflector/reflector.conf > /dev/null << 'EOF'
 --save /etc/pacman.d/mirrorlist
 --protocol https
---country "Russia,Belarus,Germany,France"
+--country "Russia,Belarus,Germany,France,Sweden,Netherlands"
 --latest 20
 --sort rate
 EOF
@@ -66,7 +66,7 @@ CleanAfter
 Provides
 PgpFetch
 Devel
-Upgrademenu
+UpgradeMenu
 BatchInstall
 EOF
 ```
@@ -82,7 +82,7 @@ sudo pacman -S mesa intel-media-driver libva-intel-driver intel-gpu-tools
 sudo pacman -S intel-ucode
 
 # Дополнительные пакеты для оптимальной работы Wayland
-sudo pacman -S xorg-server-xwayland qt5-wayland qt6-wayland xorg-mkfontscale xorg-fonts-cyrillic xorg-fonts-misc
+sudo pacman -S xorg-server-xwayland qt5-wayland qt6-wayland
 ```
 
 ### Настройка Wayland для Intel Graphics
@@ -294,8 +294,8 @@ sudo pacman -Syu
 
 ### Установка Steam и Wayland-совместимость
 ```bash
-# Установка Steam
-sudo pacman -S steam
+# Установка Steam и необходимых шрифтов
+sudo pacman -S steam xorg-mkfontscale xorg-fonts-cyrillic xorg-fonts-misc
 
 # Установка дополнительных библиотек для Steam
 sudo pacman -S lib32-mesa lib32-pipewire lib32-pipewire-jack lib32-alsa-plugins
